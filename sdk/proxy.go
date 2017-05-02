@@ -113,6 +113,7 @@ func (pxy *Proxy) Handle(eps ...Endpoint) {
 
 // Serve starts the HTTP server
 func (pxy *Proxy) Serve() error {
+	pxy.router.NotFound = &notFoundHandler{pxy.Requests}
 	pxy.router.Handle("OPTIONS", "/*all", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		pxy.setHeaders(w)
 
@@ -240,4 +241,13 @@ func mergeRequestParams(r *http.Request, p httprouter.Params) url.Values {
 	}
 
 	return params
+}
+
+type notFoundHandler struct {
+	Requests logger
+}
+
+func (h *notFoundHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	h.Requests.Printf("%v - %v:%v", http.StatusNotFound, r.Method, r.URL)
+	w.WriteHeader(http.StatusNotFound)
 }

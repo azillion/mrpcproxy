@@ -82,6 +82,8 @@ func TestNewNoServiceErr(t *testing.T) {
 func TestNewServe(t *testing.T) {
 	port := *portFlag
 
+	l := &MockLogger{}
+
 	headerKey, headerVal := "Content-Type", "text/plain; charset=utf-8"
 	// Create the service
 	service, _ := mrpc.NewService(mem.New())
@@ -92,6 +94,7 @@ func TestNewServe(t *testing.T) {
 			pxy.Handler = func(w http.ResponseWriter, r *http.Request, res *mrpcproxy.Response) {
 				w.Header().Set("X-Test-Handler-Header", "OK")
 			}
+			pxy.Requests = l
 			return nil
 		},
 	)
@@ -146,6 +149,24 @@ func TestNewServe(t *testing.T) {
 
 	if h, ok := res.Header["X-Test-Handler-Header"]; !ok || h[0] != "OK" {
 		t.Errorf("Expected 'X-Test-Handler-Header: OK'")
+	}
+
+	// Hit non existing endpoint
+	req, err = http.NewRequest("GET", fmt.Sprintf("http://127.0.0.1:%v/404", port), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err = client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.StatusCode != http.StatusNotFound {
+		t.Errorf("404 handler returns wrong status code: %v", res.StatusCode)
+	}
+
+	if l.storage[len(l.storage)-1] != "404 - GET:/404" {
+		t.Errorf("404 not logged")
 	}
 }
 
