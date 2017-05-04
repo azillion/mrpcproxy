@@ -18,7 +18,7 @@ install:
 before_script:
   - if [ "$FULL" = "true" ]; then go vet $(go list ./... | grep -v vendor); fi;
   - if [ "$FULL" = "true" ]; then test -z "$(gofmt -s -l . 2>&1 | grep -v vendor | tee /dev/stderr)"; fi;
-  - if [ "$FULL" = "true" ]; then go list ./... | grep -v /vendor/ | xargs -L1 golint; fi;
+  - if [ "$FULL" = "true" ]; then test -z "$(golint ./... 2>&1 | tee /dev/stderr)"; fi;
 
 script:
   - if [ "$FULL" = "true" ]; then goveralls -service=travis-ci; else go test -race $(go list ./... | grep -v /vendor/); fi;
