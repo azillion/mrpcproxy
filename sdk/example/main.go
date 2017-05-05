@@ -50,10 +50,9 @@ func main() {
 	eps, _ := sdk.ParseMapping([]byte(endpoints))
 	pxy, _ := sdk.New(
 		*address, service,
-		func(pxy *sdk.Proxy) error {
-			pxy.Headers = map[string]string{"Content-Type": "text/plain; charset=utf-8"}
-			return nil
-		},
+		sdk.WithHeaders(
+			map[string]string{"Content-Type": "text/plain; charset=utf-8"},
+		),
 	)
 	pxy.Handle(eps...)
 

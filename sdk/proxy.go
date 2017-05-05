@@ -1,21 +1,15 @@
 package sdk
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/miracl/mrpc"
-	"github.com/miracl/mrpc/transport"
-	"github.com/miracl/mrpcproxy"
 )
 
 const (
@@ -31,25 +25,20 @@ var (
 	ErrNoService = errors.New("service should not be nil")
 )
 
-// Proxy is a service proxying messages from HTTP to MRPC.
+// Proxy is a server that proxies http to mrpc requests.
 type Proxy struct {
-	Addr        string
-	MRPCService *mrpc.Service
-	Timeout     time.Duration
-
-	// Request ID generator
-	GetID func() string
+	addr string
 
 	// List of headers that will be added to every response
-	Headers map[string]string
-	Handler func(w http.ResponseWriter, r *http.Request, res *mrpcproxy.Response)
+	headers map[string]string
+	handler HandlerFunc
 
-	Eps    []Endpoint
 	router *httprouter.Router
+	eps    *endpoints
 
-	Debugger logger
-	Logger   logger
-	Requests logger
+	debugger logger
+	logger   logger
+	requests logger
 }
 
 type logger interface {
@@ -80,18 +69,32 @@ func New(addr string, s *mrpc.Service, opts ...func(*Proxy) error) (*Proxy, erro
 	if s == nil {
 		return nil, ErrNoService
 	}
+
+	r := httprouter.New()
+
+	handler := &addEpHandler{
+		mrpcService: s,
+		timeout:     defaultTimeout,
+
+		getID: func() string { return "" },
+
+		router: r,
+
+		debugger: defaultDebugger,
+		logger:   defaultLogger,
+		requests: defaultRequests,
+	}
+
 	pxy := &Proxy{
-		Addr:        addr,
-		MRPCService: s,
-		Timeout:     defaultTimeout,
+		addr: addr,
 
-		GetID: func() string { return "" },
+		router: r,
 
-		router: httprouter.New(),
+		eps: &endpoints{addHandler: handler},
 
-		Debugger: defaultDebugger,
-		Logger:   defaultLogger,
-		Requests: defaultRequests,
+		debugger: defaultDebugger,
+		logger:   defaultLogger,
+		requests: defaultRequests,
 	}
 
 	for _, opt := range opts {
@@ -105,142 +108,72 @@ func New(addr string, s *mrpc.Service, opts ...func(*Proxy) error) (*Proxy, erro
 
 // Handle adds endpoints to the proxy.
 func (pxy *Proxy) Handle(eps ...Endpoint) {
-	pxy.Eps = append(pxy.Eps, eps...)
-	for _, ep := range eps {
-		pxy.router.Handle(ep.Method, ep.Path, pxy.getTopicHandler(ep))
-	}
+	pxy.eps.add(eps...)
 }
 
 // Serve starts the HTTP server.
 func (pxy *Proxy) Serve() error {
-	pxy.router.NotFound = &notFoundHandler{pxy.Requests}
+	pxy.router.NotFound = &notFoundHandler{pxy.requests}
 	pxy.router.Handle("OPTIONS", "/*all", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		pxy.setHeaders(w)
+		setHeaders(w, pxy.headers)
 
 		// Run custom handler
-		if pxy.Handler != nil {
-			pxy.Handler(w, r, nil)
+		if pxy.handler != nil {
+			pxy.handler(w, r, nil)
 		}
 
-		pxy.Requests.Printf("%v - %v:%v", 200, r.Method, r.URL)
+		pxy.requests.Printf("%v - %v:%v", 200, r.Method, r.URL)
 	})
 
-	return http.ListenAndServe(pxy.Addr, pxy.router)
+	return http.ListenAndServe(pxy.addr, pxy.router)
 }
 
-func (pxy *Proxy) getTopicHandler(ep Endpoint) httprouter.Handle {
-	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		res, err := pxy.mrpcRequest(r, p, ep)
-		if err != nil {
-			pxy.Debugger.Println(err)
-			pxy.Requests.Printf("%v - %v:%v (%v)", http.StatusInternalServerError, r.Method, r.URL, ep.Topic)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		// Set the headers
-		for header, values := range res.Headers {
-			for _, v := range values {
-				w.Header().Set(header, v)
-			}
-		}
-
-		pxy.Requests.Printf("%v - %v:%v (%v)", res.Code, r.Method, r.URL, ep.Topic)
-		pxy.setHeaders(w)
-
-		// Run custom handler
-		if pxy.Handler != nil {
-			pxy.Handler(w, r, res)
-		}
-
-		w.WriteHeader(res.Code)
-		if _, err := w.Write(res.Msg); err != nil {
-			pxy.Logger.Printf("writing to http.ResponseWriter failed: %v", err)
-		}
+// WithHeaders is a functional option to set default headers.
+func WithHeaders(headers map[string]string) func(p *Proxy) error {
+	return func(p *Proxy) error {
+		p.headers = headers
+		p.eps.addHandler.headers = headers
+		return nil
 	}
 }
 
-func (pxy *Proxy) mrpcRequest(r *http.Request, p httprouter.Params, ep Endpoint) (*mrpcproxy.Response, error) {
-	req, err := pxy.newRequestFromHTTP(r, p, ep)
-	if err != nil {
-		return nil, err
+// WithHandler is a functional option to set custom handler.
+func WithHandler(f HandlerFunc) func(p *Proxy) error {
+	return func(p *Proxy) error {
+		p.handler = f
+		p.eps.addHandler.handler = f
+		return nil
 	}
+}
 
-	mrpcReq, err := json.Marshal(req)
-	if err != nil {
-		return nil, err
-	}
-
-	setTimeout := pxy.Timeout
-	if ep.KeepAlive > 0 {
-		setTimeout = time.Second * time.Duration(ep.KeepAlive)
-	}
-
-	pxy.Logger.Printf("%s, remote Addr: %s, Id: %v", r.URL.Path, req.IPAddress, req.RequestID)
-
-	res := &mrpcproxy.Response{}
-	resBytes, err := pxy.MRPCService.Request(ep.Topic, mrpcReq, setTimeout)
-	if err != nil {
-		if err == transport.ErrTimeout {
-			res.Code = http.StatusRequestTimeout
-			return res, nil
+// WithLoggers is a functional option to set loggers.
+func WithLoggers(d, l, r logger) func(p *Proxy) error {
+	return func(p *Proxy) error {
+		if d != nil {
+			p.debugger = d
+			p.eps.addHandler.debugger = d
 		}
-		return nil, err
-	}
 
-	if err := json.Unmarshal(resBytes, res); err != nil {
-		return nil, ResponseError{err}
-	}
-
-	return res, nil
-}
-
-func (pxy *Proxy) setHeaders(w http.ResponseWriter) {
-	for header, value := range pxy.Headers {
-		w.Header().Set(header, value)
-	}
-}
-
-func (pxy *Proxy) newRequestFromHTTP(r *http.Request, p httprouter.Params, ep Endpoint) (*mrpcproxy.Request, error) {
-	req := pxy.newRequest(ep.Topic, ep.Method)
-
-	if r.Body != nil {
-		var err error
-		req.Msg, err = ioutil.ReadAll(r.Body)
-		if err != nil {
-			return nil, err
+		if l != nil {
+			p.logger = l
+			p.eps.addHandler.logger = l
 		}
-	}
 
-	req.Params = mergeRequestParams(r, p)
-	req.Headers = r.Header
+		if r != nil {
+			p.requests = r
+			p.eps.addHandler.requests = r
+		}
 
-	req.IPAddress = r.Header.Get("X-Forwarded-For")
-	if req.IPAddress == "" {
-		req.IPAddress = strings.Split(strings.Split(r.RemoteAddr, ":")[0], "/")[0]
-	}
-
-	return req, nil
-}
-
-func (pxy *Proxy) newRequest(topic, action string) *mrpcproxy.Request {
-	return &mrpcproxy.Request{
-		RequestID: pxy.GetID(),
-		Timestamp: time.Now().UnixNano(),
-		Hops:      1,
-		Topic:     topic,
-		Action:    action,
+		return nil
 	}
 }
 
-// mergeRequestParams request with path parameters.
-func mergeRequestParams(r *http.Request, p httprouter.Params) url.Values {
-	params := r.URL.Query()
-	for _, param := range p {
-		params.Add(param.Key, param.Value)
+// WithIDGetter is a functional option to set loggers.
+func WithIDGetter(f func() string) func(p *Proxy) error {
+	return func(p *Proxy) error {
+		p.eps.addHandler.getID = f
+		return nil
 	}
-
-	return params
 }
 
 type notFoundHandler struct {
