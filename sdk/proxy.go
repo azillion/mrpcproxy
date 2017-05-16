@@ -34,7 +34,7 @@ type Proxy struct {
 	handler HandlerFunc
 
 	router *httprouter.Router
-	eps    *endpoints
+	eps    endpoints
 
 	debugger logger
 	logger   logger
@@ -85,12 +85,13 @@ func New(addr string, s *mrpc.Service, opts ...func(*Proxy) error) (*Proxy, erro
 		requests: defaultRequests,
 	}
 
+	eps := &memoryEndpoints{h: handler}
 	pxy := &Proxy{
 		addr: addr,
 
 		router: r,
 
-		eps: &endpoints{addHandler: handler},
+		eps: eps,
 
 		debugger: defaultDebugger,
 		logger:   defaultLogger,
@@ -106,9 +107,13 @@ func New(addr string, s *mrpc.Service, opts ...func(*Proxy) error) (*Proxy, erro
 	return pxy, nil
 }
 
+type endpoints interface {
+	Add(eps ...Endpoint)
+}
+
 // Handle adds endpoints to the proxy.
 func (pxy *Proxy) Handle(eps ...Endpoint) {
-	pxy.eps.add(eps...)
+	pxy.eps.Add(eps...)
 }
 
 // Serve starts the HTTP server.
