@@ -25,13 +25,13 @@ const (
 var (
 	defaultDebugger = log.New(os.Stdout, "[DEBUG]", log.LstdFlags|log.LUTC)
 	defaultLogger   = log.New(os.Stdout, "[PROXY]", log.LstdFlags|log.LUTC)
-	defaultReqeusts = log.New(os.Stdout, "[R]", log.LstdFlags|log.LUTC)
+	defaultRequests = log.New(os.Stdout, "[R]", log.LstdFlags|log.LUTC)
 
-	// ErrNoService is returned when proxy doesn't have service
+	// ErrNoService is returned when proxy doesn't have service.
 	ErrNoService = errors.New("service should not be nil")
 )
 
-// Proxy is the
+// Proxy is a service proxying messages from HTTP to MRPC.
 type Proxy struct {
 	Addr        string
 	MRPCService *mrpc.Service
@@ -57,7 +57,7 @@ type logger interface {
 	Printf(format string, v ...interface{})
 }
 
-// FuncOptsError is returned when functional option configuration returns error
+// FuncOptsError is returned when functional option configuration returns error.
 type FuncOptsError struct {
 	err error
 }
@@ -66,7 +66,7 @@ func (e FuncOptsError) Error() string {
 	return fmt.Sprintf("error executing functional option: %v", e.err)
 }
 
-// ResponseError is returned when
+// ResponseError is returned when the prooxy can't return the response.
 type ResponseError struct {
 	err error
 }
@@ -75,7 +75,7 @@ func (e ResponseError) Error() string {
 	return fmt.Sprintf("Malformed mrpcproxy Response: %v", e.err)
 }
 
-// New creates new Proxy
+// New creates new Proxy.
 func New(addr string, s *mrpc.Service, opts ...func(*Proxy) error) (*Proxy, error) {
 	if s == nil {
 		return nil, ErrNoService
@@ -91,7 +91,7 @@ func New(addr string, s *mrpc.Service, opts ...func(*Proxy) error) (*Proxy, erro
 
 		Debugger: defaultDebugger,
 		Logger:   defaultLogger,
-		Requests: defaultReqeusts,
+		Requests: defaultRequests,
 	}
 
 	for _, opt := range opts {
@@ -103,7 +103,7 @@ func New(addr string, s *mrpc.Service, opts ...func(*Proxy) error) (*Proxy, erro
 	return pxy, nil
 }
 
-// Handle adds endpoints to the proxy
+// Handle adds endpoints to the proxy.
 func (pxy *Proxy) Handle(eps ...Endpoint) {
 	pxy.Eps = append(pxy.Eps, eps...)
 	for _, ep := range eps {
@@ -111,7 +111,7 @@ func (pxy *Proxy) Handle(eps ...Endpoint) {
 	}
 }
 
-// Serve starts the HTTP server
+// Serve starts the HTTP server.
 func (pxy *Proxy) Serve() error {
 	pxy.router.NotFound = &notFoundHandler{pxy.Requests}
 	pxy.router.Handle("OPTIONS", "/*all", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
@@ -233,7 +233,7 @@ func (pxy *Proxy) newRequest(topic, action string) *mrpcproxy.Request {
 	}
 }
 
-// mergeRequestParams request with path parameters
+// mergeRequestParams request with path parameters.
 func mergeRequestParams(r *http.Request, p httprouter.Params) url.Values {
 	params := r.URL.Query()
 	for _, param := range p {

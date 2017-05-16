@@ -5,7 +5,7 @@ import (
 	"net/url"
 )
 
-// Request is the the format of a mrpcproxy request
+// Request is the the format of a mrpcproxy request.
 type Request struct {
 	RequestID string
 	Timestamp int64
