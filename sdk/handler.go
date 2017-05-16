@@ -26,8 +26,9 @@ type addEpHandler struct {
 
 	router *httprouter.Router
 
+	// List of headers that will be added to every response
 	headers map[string]string
-	handler func(w http.ResponseWriter, r *http.Request, res *mrpcproxy.Response)
+	handler HandlerFunc
 
 	debugger logger
 	logger   logger

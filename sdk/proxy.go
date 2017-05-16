@@ -27,14 +27,12 @@ var (
 
 // Proxy is a server that proxies http to mrpc requests.
 type Proxy struct {
-	addr string
-
-	// List of headers that will be added to every response
-	headers map[string]string
-	handler HandlerFunc
+	addr         string
+	addEpHandler addEpHandler
 
 	router *httprouter.Router
 	eps    endpoints
+	epsCh  <-chan Endpoint
 
 	debugger logger
 	logger   logger
@@ -72,26 +70,23 @@ func New(addr string, s *mrpc.Service, opts ...func(*Proxy) error) (*Proxy, erro
 
 	r := httprouter.New()
 
-	handler := &addEpHandler{
-		mrpcService: s,
-		timeout:     defaultTimeout,
-
-		getID: func() string { return "" },
-
-		router: r,
-
-		debugger: defaultDebugger,
-		logger:   defaultLogger,
-		requests: defaultRequests,
-	}
-
-	eps := &memoryEndpoints{h: handler}
 	pxy := &Proxy{
 		addr: addr,
+		addEpHandler: addEpHandler{
+			mrpcService: s,
+			timeout:     defaultTimeout,
+
+			getID: func() string { return "" },
+
+			router: r,
+
+			debugger: defaultDebugger,
+			logger:   defaultLogger,
+			requests: defaultRequests,
+		},
 
 		router: r,
-
-		eps: eps,
+		eps:    &memoryEndpoints{},
 
 		debugger: defaultDebugger,
 		logger:   defaultLogger,
@@ -114,17 +109,20 @@ type endpoints interface {
 // Handle adds endpoints to the proxy.
 func (pxy *Proxy) Handle(eps ...Endpoint) {
 	pxy.eps.Add(eps...)
+	for _, ep := range eps {
+		pxy.addEpHandler.Handle(&ep)
+	}
 }
 
 // Serve starts the HTTP server.
 func (pxy *Proxy) Serve() error {
 	pxy.router.NotFound = &notFoundHandler{pxy.requests}
 	pxy.router.Handle("OPTIONS", "/*all", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		setHeaders(w, pxy.headers)
+		setHeaders(w, pxy.addEpHandler.headers)
 
 		// Run custom handler
-		if pxy.handler != nil {
-			pxy.handler(w, r, nil)
+		if pxy.addEpHandler.handler != nil {
+			pxy.addEpHandler.handler(w, r, nil)
 		}
 
 		pxy.requests.Printf("%v - %v:%v", 200, r.Method, r.URL)
@@ -136,8 +134,7 @@ func (pxy *Proxy) Serve() error {
 // WithHeaders is a functional option to set default headers.
 func WithHeaders(headers map[string]string) func(p *Proxy) error {
 	return func(p *Proxy) error {
-		p.headers = headers
-		p.eps.addHandler.headers = headers
+		p.addEpHandler.headers = headers
 		return nil
 	}
 }
@@ -145,8 +142,7 @@ func WithHeaders(headers map[string]string) func(p *Proxy) error {
 // WithHandler is a functional option to set custom handler.
 func WithHandler(f HandlerFunc) func(p *Proxy) error {
 	return func(p *Proxy) error {
-		p.handler = f
-		p.eps.addHandler.handler = f
+		p.addEpHandler.handler = f
 		return nil
 	}
 }
@@ -156,17 +152,17 @@ func WithLoggers(d, l, r logger) func(p *Proxy) error {
 	return func(p *Proxy) error {
 		if d != nil {
 			p.debugger = d
-			p.eps.addHandler.debugger = d
+			p.addEpHandler.debugger = d
 		}
 
 		if l != nil {
 			p.logger = l
-			p.eps.addHandler.logger = l
+			p.addEpHandler.logger = l
 		}
 
 		if r != nil {
 			p.requests = r
-			p.eps.addHandler.requests = r
+			p.addEpHandler.requests = r
 		}
 
 		return nil
@@ -176,7 +172,7 @@ func WithLoggers(d, l, r logger) func(p *Proxy) error {
 // WithIDGetter is a functional option to set loggers.
 func WithIDGetter(f func() string) func(p *Proxy) error {
 	return func(p *Proxy) error {
-		p.eps.addHandler.getID = f
+		p.addEpHandler.getID = f
 		return nil
 	}
 }

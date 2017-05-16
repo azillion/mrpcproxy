@@ -42,7 +42,7 @@ func TestNew(t *testing.T) {
 		t.Errorf("Functional option not executed")
 	}
 
-	if pxy.addr != addr || pxy.eps.addHandler.mrpcService != service {
+	if pxy.addr != addr || pxy.addEpHandler.mrpcService != service {
 		t.Errorf("Unexpected procxy ")
 	}
 }
@@ -57,7 +57,7 @@ func TestSimpleFuncOptions(t *testing.T) {
 		{
 			WithIDGetter(func() string { return "uuid" }),
 			func(t *testing.T, p *Proxy, i int) {
-				if p.eps.addHandler.getID() != "uuid" {
+				if p.addEpHandler.getID() != "uuid" {
 					t.Errorf("Case %v: SetIDGetter is not working correctly", i)
 				}
 			},
@@ -69,17 +69,17 @@ func TestSimpleFuncOptions(t *testing.T) {
 				p.logger.Println("p.logger")
 				p.requests.Println("p.requests")
 
-				p.eps.addHandler.debugger.Println("p.eps.addHandler.debugger")
-				p.eps.addHandler.logger.Println("p.eps.addHandler.logger")
-				p.eps.addHandler.requests.Println("p.eps.addHandler.requests")
+				p.addEpHandler.debugger.Println("p.addEpHandler.debugger")
+				p.addEpHandler.logger.Println("p.addEpHandler.logger")
+				p.addEpHandler.requests.Println("p.addEpHandler.requests")
 
 				expected := []string{
 					"p.debugger\n",
 					"p.logger\n",
 					"p.requests\n",
-					"p.eps.addHandler.debugger\n",
-					"p.eps.addHandler.logger\n",
-					"p.eps.addHandler.requests\n",
+					"p.addEpHandler.debugger\n",
+					"p.addEpHandler.logger\n",
+					"p.addEpHandler.requests\n",
 				}
 				if strings.Join(l.storage, ",") != strings.Join(expected, ",") {
 					t.Errorf("Case %v: SetLoggers is not working correctly", i)
