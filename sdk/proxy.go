@@ -131,50 +131,42 @@ func (pxy *Proxy) Serve() error {
 	return http.ListenAndServe(pxy.addr, pxy.router)
 }
 
-// WithHeaders is a functional option to set default headers.
-func WithHeaders(headers map[string]string) func(p *Proxy) error {
-	return func(p *Proxy) error {
-		p.addEpHandler.headers = headers
-		return nil
+// SetHeaders sets the default headers.
+func (pxy *Proxy) SetHeaders(h map[string]string) {
+	pxy.addEpHandler.headers = h
+}
+
+// SetHandler sets custom handler.
+func (pxy *Proxy) SetHandler(f HandlerFunc) {
+	pxy.addEpHandler.handler = f
+}
+
+// SetGetID sets the ID getter function.
+func (pxy *Proxy) SetGetID(f func() string) {
+	pxy.addEpHandler.getID = f
+}
+
+// SetLoggers sets the loggers.
+func (pxy *Proxy) SetLoggers(d, l, r logger) {
+	if d != nil {
+		pxy.debugger = d
+		pxy.addEpHandler.debugger = d
+	}
+
+	if l != nil {
+		pxy.logger = l
+		pxy.addEpHandler.logger = l
+	}
+
+	if r != nil {
+		pxy.requests = r
+		pxy.addEpHandler.requests = r
 	}
 }
 
-// WithHandler is a functional option to set custom handler.
-func WithHandler(f HandlerFunc) func(p *Proxy) error {
-	return func(p *Proxy) error {
-		p.addEpHandler.handler = f
-		return nil
-	}
-}
-
-// WithLoggers is a functional option to set loggers.
-func WithLoggers(d, l, r logger) func(p *Proxy) error {
-	return func(p *Proxy) error {
-		if d != nil {
-			p.debugger = d
-			p.addEpHandler.debugger = d
-		}
-
-		if l != nil {
-			p.logger = l
-			p.addEpHandler.logger = l
-		}
-
-		if r != nil {
-			p.requests = r
-			p.addEpHandler.requests = r
-		}
-
-		return nil
-	}
-}
-
-// WithIDGetter is a functional option to set loggers.
-func WithIDGetter(f func() string) func(p *Proxy) error {
-	return func(p *Proxy) error {
-		p.addEpHandler.getID = f
-		return nil
-	}
+// EnableDynamicEndpoints enables the dynamic endpoint registration.
+func (pxy *Proxy) EnableDynamicEndpoints() {
+	pxy.eps, pxy.epsCh = newDynamicEndpoints()
 }
 
 type notFoundHandler struct {
