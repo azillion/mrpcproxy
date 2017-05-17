@@ -31,7 +31,7 @@ func TestSimpleExample(t *testing.T) {
 	}
 
 	if string(hello) != "Hello world" {
-		t.Errorf("Unexpected response on example.hello: %v", string(hello))
+		t.Errorf("Unexpected response from /hello: %v", string(hello))
 	}
 
 }

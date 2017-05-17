@@ -11,57 +11,45 @@ import (
 	"github.com/miracl/mrpcproxy/sdk"
 )
 
-var (
-	address = flag.String("addr", ":8080", "Address for the http server")
-)
-
-const (
-	group   = "example"
-	name    = "example"
-	version = "1.0"
-
-	endpoints = `
-		{
-		  "example.hello": {
-		    "endpoints": [
-		      {
-		        "method": "GET",
-		        "path": "/hello"
-		      }
-		    ]
-		  }
-		}`
-)
-
 func main() {
+	addr := flag.String("addr", ":8080", "Address for the http server")
 	flag.Parse()
 
-	// Create the service
-	service, _ := mrpc.NewService(
-		mem.New(),
-		func(s *mrpc.Service) error {
-			s.Group = group
-			s.Name = name
-			s.Version = version
-			return nil
-		},
+	transport := mem.New()
+	go server(transport)
+	proxy(*addr, transport)
+}
+
+func proxy(addr string, transport mrpc.Transport) {
+	service, _ := mrpc.NewService(transport)
+
+	pxy, _ := sdk.New(
+		addr, service,
+		sdk.WithHeaders(map[string]string{"Content-Type": "text/plain; charset=utf-8"}),
 	)
 
-	eps, _ := sdk.ParseMapping([]byte(endpoints))
-	pxy, _ := sdk.New(
-		*address, service,
-		sdk.WithHeaders(
-			map[string]string{"Content-Type": "text/plain; charset=utf-8"},
-		),
-	)
+	eps, _ := sdk.ParseMapping([]byte(`{
+    "service.hello": {
+        "endpoints": [{
+            "method": "GET",
+            "path": "/hello"
+        }]
+    }
+	}`))
 	pxy.Handle(eps...)
 
-	// Simulate application handling mrpc request
+	log.Println("Starting example proxy")
+	log.Fatalf("Proxy stopped: %v", pxy.Serve())
+}
+
+// Simulate service handling mrpc request
+func server(transport mrpc.Transport) {
+	service, _ := mrpc.NewService(transport)
+
 	service.HandleFunc("hello", func(w mrpc.TopicWriter, data []byte) {
 		log.Println("[Upstream] Request: hello")
 
 		msg, _ := json.Marshal(&mrpcproxy.Response{
-			// RequestID string
 			Code: 200,
 			Msg:  []byte("Hello world"),
 		})
@@ -69,6 +57,6 @@ func main() {
 		w.Write(msg)
 	})
 
-	log.Println("Starting example proxy")
-	log.Fatalf("Service stopped: %v", pxy.Serve())
+	log.Println("Starting example service")
+	log.Fatalf("Service stopped: %v", service.Serve())
 }
