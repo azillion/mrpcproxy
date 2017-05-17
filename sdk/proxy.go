@@ -86,7 +86,6 @@ func New(addr string, s *mrpc.Service, opts ...func(*Proxy) error) (*Proxy, erro
 		},
 
 		router: r,
-		eps:    &memoryEndpoints{},
 
 		debugger: defaultDebugger,
 		logger:   defaultLogger,
@@ -108,7 +107,6 @@ type endpoints interface {
 
 // Handle adds endpoints to the proxy.
 func (pxy *Proxy) Handle(eps ...Endpoint) {
-	pxy.eps.Add(eps...)
 	for _, ep := range eps {
 		pxy.addEpHandler.Handle(&ep)
 	}
