@@ -299,6 +299,7 @@ func TestGetTopicHandler(t *testing.T) {
 	}
 
 	go service.Serve()
+	defer service.Stop(nil)
 	time.Sleep(100 * time.Millisecond) // Block so service starts
 
 	for i, tc := range cases {
