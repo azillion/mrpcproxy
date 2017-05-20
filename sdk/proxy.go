@@ -1,6 +1,7 @@
 package sdk
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,7 +34,7 @@ var (
 
 // Proxy is a service proxying messages from HTTP to MRPC.
 type Proxy struct {
-	Addr        string
+	http        *http.Server
 	MRPCService *mrpc.Service
 	Timeout     time.Duration
 
@@ -80,14 +81,15 @@ func New(addr string, s *mrpc.Service, opts ...func(*Proxy) error) (*Proxy, erro
 	if s == nil {
 		return nil, ErrNoService
 	}
+	r := httprouter.New()
 	pxy := &Proxy{
-		Addr:        addr,
+		http:        &http.Server{Addr: addr, Handler: r},
 		MRPCService: s,
 		Timeout:     defaultTimeout,
 
 		GetID: func() string { return "" },
 
-		router: httprouter.New(),
+		router: r,
 
 		Debugger: defaultDebugger,
 		Logger:   defaultLogger,
@@ -125,7 +127,12 @@ func (pxy *Proxy) Serve() error {
 		pxy.Requests.Printf("%v - %v:%v", 200, r.Method, r.URL)
 	})
 
-	return http.ListenAndServe(pxy.Addr, pxy.router)
+	return pxy.http.ListenAndServe()
+}
+
+// Stop shutdowns the HTTP server
+func (pxy *Proxy) Stop(ctx context.Context) error {
+	return pxy.http.Shutdown(ctx)
 }
 
 func (pxy *Proxy) getTopicHandler(ep Endpoint) httprouter.Handle {

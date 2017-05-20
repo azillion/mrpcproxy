@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"context"
+
 	"github.com/julienschmidt/httprouter"
 	"github.com/miracl/mrpc"
 	"github.com/miracl/mrpc/transport/mem"
@@ -46,8 +48,8 @@ func TestNew(t *testing.T) {
 		t.Errorf("Functional option not executed")
 	}
 
-	if pxy.Addr != addr || pxy.MRPCService != service {
-		t.Errorf("Unexpected procxy ")
+	if pxy.http.Addr != addr || pxy.MRPCService != service {
+		t.Errorf("Unexpected proxy")
 	}
 }
 
@@ -167,6 +169,15 @@ func TestNewServe(t *testing.T) {
 
 	if l.storage[len(l.storage)-1] != "404 - GET:/404" {
 		t.Errorf("404 not logged")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	pxy.Stop(ctx)
+	req, _ = http.NewRequest("GET", fmt.Sprintf("http://127.0.0.1:%v/404", port), nil)
+	res, _ = client.Do(req)
+	if res != nil {
+		t.Error("Proxy still working")
 	}
 }
 
@@ -300,6 +311,7 @@ func TestGetTopicHandler(t *testing.T) {
 
 	go service.Serve()
 	defer service.Stop(nil)
+
 	time.Sleep(100 * time.Millisecond) // Block so service starts
 
 	for i, tc := range cases {
