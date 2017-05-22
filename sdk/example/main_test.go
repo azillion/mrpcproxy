@@ -19,7 +19,7 @@ func TestSimpleExample(t *testing.T) {
 	// Block so the main starts
 	time.Sleep(100 * time.Millisecond)
 
-	// Request the service
+	// Request the service /hello
 	res, err := http.Get(fmt.Sprintf("http://127.0.0.1:%v/hello", *port))
 	if err != nil {
 		t.Fatal(err)
@@ -34,4 +34,18 @@ func TestSimpleExample(t *testing.T) {
 		t.Errorf("Unexpected response from /hello: %v", string(hello))
 	}
 
+	// Request the service /dynamic
+	res, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/dynamic", *port))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dynamic, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		t.Fatalf("Read request body: %v", err)
+	}
+
+	if string(dynamic) != "Hello world" {
+		t.Errorf("Unexpected response from /hello: %v", string(hello))
+	}
 }

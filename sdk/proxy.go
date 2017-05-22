@@ -10,6 +10,7 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/miracl/mrpc"
+	"github.com/miracl/mrpcproxy"
 )
 
 const (
@@ -31,8 +32,7 @@ type Proxy struct {
 	addEpHandler addEpHandler
 
 	router *httprouter.Router
-	eps    endpoints
-	epsCh  <-chan Endpoint
+	epsCh  <-chan []mrpcproxy.Endpoint
 
 	debugger logger
 	logger   logger
@@ -101,12 +101,8 @@ func New(addr string, s *mrpc.Service, opts ...func(*Proxy) error) (*Proxy, erro
 	return pxy, nil
 }
 
-type endpoints interface {
-	Add(eps ...Endpoint)
-}
-
 // Handle adds endpoints to the proxy.
-func (pxy *Proxy) Handle(eps ...Endpoint) {
+func (pxy *Proxy) Handle(eps ...mrpcproxy.Endpoint) {
 	for _, ep := range eps {
 		pxy.addEpHandler.Handle(&ep)
 	}
@@ -125,6 +121,14 @@ func (pxy *Proxy) Serve() error {
 
 		pxy.requests.Printf("%v - %v:%v", 200, r.Method, r.URL)
 	})
+
+	if pxy.epsCh != nil {
+		go func() {
+			for eps := range pxy.epsCh {
+				pxy.Handle(eps...)
+			}
+		}()
+	}
 
 	return http.ListenAndServe(pxy.addr, pxy.router)
 }
@@ -164,7 +168,7 @@ func (pxy *Proxy) SetLoggers(d, l, r logger) {
 
 // EnableDynamicEndpoints enables the dynamic endpoint registration.
 func (pxy *Proxy) EnableDynamicEndpoints() {
-	pxy.eps, pxy.epsCh = newDynamicEndpoints()
+	pxy.epsCh = startDynamicEndpoints(pxy.addEpHandler.mrpcService)
 }
 
 type notFoundHandler struct {

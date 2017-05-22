@@ -57,7 +57,7 @@ func TestGetTopicHandler(t *testing.T) {
 	cases := []struct {
 		// Proxy
 		topic   string
-		timeout int
+		timeout time.Duration
 
 		// Proxy logging
 		debugger []string
@@ -118,7 +118,7 @@ func TestGetTopicHandler(t *testing.T) {
 		},
 		{
 			topic:     "c",
-			timeout:   2,
+			timeout:   2 * time.Second,
 			logger:    []string{"/c, remote Addr: 1.1.1.1, Id: uuid"},
 			requests:  []string{"200 - GET:/c (service.c)"},
 			resStatus: http.StatusOK,
@@ -170,11 +170,11 @@ func TestGetTopicHandler(t *testing.T) {
 				requests: r,
 			}
 
-			h := epHandler.getTopicHandler(&Endpoint{
-				fmt.Sprintf("service.%v", tc.topic),
-				"GET",
-				fmt.Sprintf("/%v", tc.topic),
-				tc.timeout,
+			h := epHandler.getTopicHandler(&mrpcproxy.Endpoint{
+				Topic:     fmt.Sprintf("service.%v", tc.topic),
+				Method:    "GET",
+				Path:      fmt.Sprintf("/%v", tc.topic),
+				KeepAlive: tc.timeout,
 			})
 
 			req, err := http.NewRequest("GET", fmt.Sprintf("/%v", tc.topic), tc.reqBody)

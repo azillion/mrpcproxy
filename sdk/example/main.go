@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"log"
+	"time"
 
 	"github.com/miracl/mrpc"
 	"github.com/miracl/mrpc/transport/mem"
@@ -21,10 +22,11 @@ func main() {
 }
 
 func proxy(addr string, transport mrpc.Transport) {
-	service, _ := mrpc.NewService(transport)
+	service, _ := mrpc.NewService(transport, mrpc.WithName("proxy"))
 
 	pxy, _ := sdk.New(
 		addr, service,
+		sdk.WithDynamicEndpoints(),
 		sdk.WithHeaders(map[string]string{"Content-Type": "text/plain; charset=utf-8"}),
 	)
 
@@ -32,7 +34,8 @@ func proxy(addr string, transport mrpc.Transport) {
     "service.hello": {
         "endpoints": [{
             "method": "GET",
-            "path": "/hello"
+            "path": "/hello",
+						"keepAlive": 1
         }]
     }
 	}`))
@@ -46,8 +49,35 @@ func proxy(addr string, transport mrpc.Transport) {
 func server(transport mrpc.Transport) {
 	service, _ := mrpc.NewService(transport)
 
+	// Handle statically registered endpoint
 	service.HandleFunc("hello", func(w mrpc.TopicWriter, data []byte) {
 		log.Println("[Upstream] Request: hello")
+
+		msg, _ := json.Marshal(&mrpcproxy.Response{
+			Code: 200,
+			Msg:  []byte("Hello world"),
+		})
+
+		w.Write(msg)
+	})
+
+	// Register and handle dynamic endpoint
+	ep := mrpcproxy.Endpoint{
+		Topic:  "service.dynamic",
+		Method: "GET",
+		Path:   "/dynamic",
+	}
+	if err := mrpcproxy.RegisterEndpoints(service, "proxy", time.Second, ep); err != nil {
+		log.Println("Dynamic endpoint registration failed")
+	}
+
+	// TODO: REMOVE
+	if err := mrpcproxy.RegisterEndpoints(service, "proxy", time.Second, ep); err != nil {
+		log.Println("Dynamic endpoint registration failed")
+	}
+
+	service.HandleFunc("dynamic", func(w mrpc.TopicWriter, data []byte) {
+		log.Println("[Upstream] Request: dynamic")
 
 		msg, _ := json.Marshal(&mrpcproxy.Response{
 			Code: 200,

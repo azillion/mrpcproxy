@@ -35,11 +35,11 @@ type addEpHandler struct {
 	requests logger
 }
 
-func (h *addEpHandler) Handle(ep *Endpoint) {
+func (h *addEpHandler) Handle(ep *mrpcproxy.Endpoint) {
 	h.router.Handle(ep.Method, ep.Path, h.getTopicHandler(ep))
 }
 
-func (h *addEpHandler) getTopicHandler(ep *Endpoint) httprouter.Handle {
+func (h *addEpHandler) getTopicHandler(ep *mrpcproxy.Endpoint) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		res, err := h.mrpcRequest(r, p, ep)
 		if err != nil {
@@ -71,7 +71,7 @@ func (h *addEpHandler) getTopicHandler(ep *Endpoint) httprouter.Handle {
 	}
 }
 
-func (h *addEpHandler) mrpcRequest(r *http.Request, p httprouter.Params, ep *Endpoint) (*mrpcproxy.Response, error) {
+func (h *addEpHandler) mrpcRequest(r *http.Request, p httprouter.Params, ep *mrpcproxy.Endpoint) (*mrpcproxy.Response, error) {
 	req, err := h.newRequestFromHTTP(r, p, ep)
 	if err != nil {
 		return nil, err
@@ -106,7 +106,7 @@ func (h *addEpHandler) mrpcRequest(r *http.Request, p httprouter.Params, ep *End
 	return res, nil
 }
 
-func (h *addEpHandler) newRequestFromHTTP(r *http.Request, p httprouter.Params, ep *Endpoint) (*mrpcproxy.Request, error) {
+func (h *addEpHandler) newRequestFromHTTP(r *http.Request, p httprouter.Params, ep *mrpcproxy.Endpoint) (*mrpcproxy.Request, error) {
 	req := h.newRequest(ep.Topic, ep.Method)
 
 	if r.Body != nil {

@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	"github.com/miracl/mrpcproxy"
 )
 
 func TestParseMappingCases(t *testing.T) {
 	cases := []struct {
 		json      []byte
-		eps       []Endpoint
+		eps       []mrpcproxy.Endpoint
 		expectErr bool
 		err       error
 	}{
@@ -42,7 +44,7 @@ func TestParseMappingCases(t *testing.T) {
 				  }
 				}
 			`),
-			[]Endpoint{
+			[]mrpcproxy.Endpoint{
 				{Topic: "a", Method: "GET", Path: "/get/a/"},
 				{Topic: "a", Method: "PUT", Path: "/put/a/"},
 				{Topic: "b", Method: "GET", Path: "/get/b/"},

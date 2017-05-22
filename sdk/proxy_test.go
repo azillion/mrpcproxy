@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -138,7 +139,7 @@ func TestNewServe(t *testing.T) {
 		}),
 		WithLoggers(nil, nil, l),
 	)
-	pxy.Handle(Endpoint{"service.a", "GET", "/a", 0})
+	pxy.Handle(mrpcproxy.Endpoint{Topic: "service.a", Method: "GET", Path: "/a"})
 
 	// Simulate application handling mrpc request
 	service.HandleFunc("a", func(w mrpc.TopicWriter, data []byte) {
@@ -208,6 +209,60 @@ func TestNewServe(t *testing.T) {
 	fmt.Printf("%#v\n", l.storage)
 	if l.storage[len(l.storage)-1] != "404 - GET:/404" {
 		t.Errorf("404 not logged")
+	}
+}
+
+func TestNewDynamicEndpoints(t *testing.T) {
+	port := *portFlag
+
+	trans := mem.New()
+
+	// Define proxy
+	pxyMRPC, err := mrpc.NewService(trans, mrpc.WithName("proxy"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pxy, err := New(fmt.Sprintf(":%v", port), pxyMRPC, WithDynamicEndpoints())
+	if err != nil {
+		t.Fatal(err)
+	}
+	go pxy.Serve()
+	// TODO: STOP
+
+	// Block so the proxy starts
+	time.Sleep(100 * time.Millisecond)
+
+	// Define service
+	srvMRPC, err := mrpc.NewService(trans, mrpc.WithName("service"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ep := mrpcproxy.Endpoint{Topic: srvMRPC.GetFQTopic("test"), Method: "GET", Path: "/test"}
+
+	// Add handle for the request
+	srvMRPC.HandleFunc("test", func(w mrpc.TopicWriter, data []byte) {
+		res, _ := json.Marshal(&mrpcproxy.Response{Code: 200})
+		w.Write(res)
+	})
+
+	// RegisterEndpoints should be callable more than once
+	var wg sync.WaitGroup
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			err := mrpcproxy.RegisterEndpoints(srvMRPC, "proxy", time.Second, ep)
+			if err != nil {
+				t.Fatal("Endpoint registration failed:", err)
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	res, err := http.Get(fmt.Sprintf("http://127.0.0.1:%v/test", port))
+	if res.StatusCode != http.StatusOK {
+		t.Fatal("Request to dynamically added endpoint failed. Status code:", res.StatusCode)
 	}
 }
 
