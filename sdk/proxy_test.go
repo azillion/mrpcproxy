@@ -189,7 +189,7 @@ func TestGetTopicHandler(t *testing.T) {
 	})
 	service.HandleFunc("b", func(w mrpc.TopicWriter, data []byte) {})
 	service.HandleFunc("c", func(w mrpc.TopicWriter, data []byte) {
-		time.Sleep(2 * time.Second)
+		time.Sleep(1100 * time.Millisecond)
 		msg, _ := json.Marshal(&mrpcproxy.Response{
 			Code:    200,
 			Msg:     []byte("OK"),

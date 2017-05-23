@@ -39,12 +39,7 @@ func main() {
 	// Create the service
 	service, _ := mrpc.NewService(
 		mem.New(),
-		func(s *mrpc.Service) error {
-			s.Group = group
-			s.Name = name
-			s.Version = version
-			return nil
-		},
+		mrpc.WithNGV(name, group, version),
 	)
 
 	eps, _ := sdk.ParseMapping([]byte(endpoints))
