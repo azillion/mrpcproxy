@@ -200,7 +200,7 @@ func TestGetTopicHandler(t *testing.T) {
 	})
 	service.HandleFunc("b", func(w mrpc.TopicWriter, data []byte) {})
 	service.HandleFunc("c", func(w mrpc.TopicWriter, data []byte) {
-		time.Sleep(1100 * time.Millisecond)
+		time.Sleep(2 * time.Millisecond)
 		msg, _ := json.Marshal(&mrpcproxy.Response{
 			Code:    200,
 			Msg:     []byte("OK"),
@@ -263,6 +263,7 @@ func TestGetTopicHandler(t *testing.T) {
 		},
 		{
 			topic:     "b",
+			timeout:   1,
 			logger:    []string{"/b, remote Addr: 1.1.1.1, Id: uuid"},
 			requests:  []string{"408 - GET:/b (service.b)"},
 			resStatus: http.StatusRequestTimeout,
@@ -272,6 +273,7 @@ func TestGetTopicHandler(t *testing.T) {
 		},
 		{
 			topic:     "c",
+			timeout:   1,
 			logger:    []string{"/c, remote Addr: 1.1.1.1, Id: uuid"},
 			requests:  []string{"408 - GET:/c (service.c)"},
 			resStatus: http.StatusRequestTimeout,
@@ -281,7 +283,7 @@ func TestGetTopicHandler(t *testing.T) {
 		},
 		{
 			topic:     "c",
-			timeout:   2,
+			timeout:   3,
 			logger:    []string{"/c, remote Addr: 1.1.1.1, Id: uuid"},
 			requests:  []string{"200 - GET:/c (service.c)"},
 			resStatus: http.StatusOK,
@@ -312,7 +314,7 @@ func TestGetTopicHandler(t *testing.T) {
 	go service.Serve()
 	defer service.Stop(nil)
 
-	time.Sleep(100 * time.Millisecond) // Block so service starts
+	time.Sleep(1 * time.Millisecond) // Block so service starts
 
 	for i, tc := range cases {
 		t.Run(fmt.Sprintf("Case%v", i), func(t *testing.T) {

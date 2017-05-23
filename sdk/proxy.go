@@ -180,7 +180,7 @@ func (pxy *Proxy) mrpcRequest(r *http.Request, p httprouter.Params, ep Endpoint)
 
 	setTimeout := pxy.Timeout
 	if ep.KeepAlive > 0 {
-		setTimeout = time.Second * time.Duration(ep.KeepAlive)
+		setTimeout = time.Duration(ep.KeepAlive) * time.Millisecond
 	}
 
 	pxy.Logger.Printf("%s, remote Addr: %s, Id: %v", r.URL.Path, req.IPAddress, req.RequestID)
