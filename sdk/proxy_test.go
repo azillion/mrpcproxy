@@ -212,6 +212,14 @@ func TestGetTopicHandler(t *testing.T) {
 	service.HandleFunc("e", func(w mrpc.TopicWriter, data []byte) {
 		w.Write([]byte("MRPC response that is not mrpcproxy.Response formatted"))
 	})
+	service.HandleFunc("w.1", func(w mrpc.TopicWriter, data []byte) {
+		msg, _ := json.Marshal(&mrpcproxy.Response{Code: 200, Msg: []byte("w.1")})
+		w.Write(msg)
+	})
+	service.HandleFunc("w.2", func(w mrpc.TopicWriter, data []byte) {
+		msg, _ := json.Marshal(&mrpcproxy.Response{Code: 200, Msg: []byte("w.2")})
+		w.Write(msg)
+	})
 
 	handler := func(w http.ResponseWriter, r *http.Request, res *mrpcproxy.Response) {
 		w.Header().Set("X-Test-Handler-Header", "OK")
@@ -220,6 +228,7 @@ func TestGetTopicHandler(t *testing.T) {
 	cases := []struct {
 		// Proxy
 		topic   string
+		pattern string // defaults to topic
 		timeout int
 
 		// Proxy logging
@@ -228,7 +237,9 @@ func TestGetTopicHandler(t *testing.T) {
 		requests []string
 
 		// HTTP Request/Response
+		reqURL     string // defaults to topic
 		reqBody    io.Reader
+		reqParams  httprouter.Params
 		reqHeaders map[string][]string
 		resStatus  int
 		resBody    string
@@ -309,6 +320,28 @@ func TestGetTopicHandler(t *testing.T) {
 			resStatus:  http.StatusInternalServerError,
 			resHeaders: map[string][]string{},
 		},
+		{
+			topic:      "w.{{.id}}",
+			pattern:    "/w/:id",
+			logger:     []string{"/w/1, remote Addr: 1.1.1.1, Id: uuid"},
+			requests:   []string{"200 - GET:/w/1 (service.w.1)"},
+			reqURL:     "/w/1",
+			resStatus:  http.StatusOK,
+			resBody:    "w.1",
+			reqParams:  httprouter.Params{{Key: "id", Value: "1"}},
+			resHeaders: map[string][]string{"X-Test-Handler-Header": {"OK"}},
+		},
+		{
+			topic:      "w.{{.id}}",
+			pattern:    "/w/:id",
+			logger:     []string{"/w/2, remote Addr: 1.1.1.1, Id: uuid"},
+			requests:   []string{"200 - GET:/w/2 (service.w.2)"},
+			reqURL:     "/w/2",
+			resStatus:  http.StatusOK,
+			resBody:    "w.2",
+			reqParams:  httprouter.Params{{Key: "id", Value: "2"}},
+			resHeaders: map[string][]string{"X-Test-Handler-Header": {"OK"}},
+		},
 	}
 
 	go service.Serve()
@@ -330,14 +363,30 @@ func TestGetTopicHandler(t *testing.T) {
 			r := &MockLogger{}
 			pxy.Requests = r
 
-			h := pxy.getTopicHandler(Endpoint{
+			var pattern string
+			if tc.pattern != "" {
+				pattern = tc.pattern
+			} else {
+				pattern = fmt.Sprintf("/%v", tc.topic)
+			}
+
+			h, err := pxy.getTopicHandler(Endpoint{
 				fmt.Sprintf("service.%v", tc.topic),
 				"GET",
-				fmt.Sprintf("/%v", tc.topic),
+				pattern,
 				tc.timeout,
 			})
+			if err != nil {
+				t.Fatal(err)
+			}
 
-			req, err := http.NewRequest("GET", fmt.Sprintf("/%v", tc.topic), tc.reqBody)
+			var reqURL string
+			if tc.reqURL != "" {
+				reqURL = tc.reqURL
+			} else {
+				reqURL = fmt.Sprintf("/%v", tc.topic)
+			}
+			req, err := http.NewRequest("GET", reqURL, tc.reqBody)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -347,7 +396,7 @@ func TestGetTopicHandler(t *testing.T) {
 			}
 
 			rr := httptest.NewRecorder()
-			h(rr, req, httprouter.Params{})
+			h(rr, req, tc.reqParams)
 
 			// Check the status code is what we expect.
 			if status := rr.Code; status != tc.resStatus {

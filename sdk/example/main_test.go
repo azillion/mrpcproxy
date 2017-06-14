@@ -30,8 +30,22 @@ func TestSimpleExample(t *testing.T) {
 		t.Fatalf("Read request body: %v", err)
 	}
 
-	if string(hello) != "Hello world" {
+	if string(hello) != "Hello world (hello)" {
 		t.Errorf("Unexpected response on example.hello: %v", string(hello))
 	}
 
+	// Request the endpoint forwarding to templated topic
+	res, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/hello/world", *port))
+	if err != nil {
+		t.Fatal(err)
+	}
+	hello, err = ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		t.Fatalf("Read request body: %v", err)
+	}
+
+	if string(hello) != "Hello world (hello.world)" {
+		t.Errorf("Unexpected response on example.hello.world: %v", string(hello))
+	}
 }

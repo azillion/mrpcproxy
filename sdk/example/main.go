@@ -29,6 +29,14 @@ const (
 		        "path": "/hello"
 		      }
 		    ]
+		  },
+			"example.hello.{{.something}}": {
+		    "endpoints": [
+		      {
+		        "method": "GET",
+		        "path": "/hello/:something"
+		      }
+		    ]
 		  }
 		}`
 )
@@ -57,9 +65,18 @@ func main() {
 		log.Println("[Upstream] Request: hello")
 
 		msg, _ := json.Marshal(&mrpcproxy.Response{
-			// RequestID string
 			Code: 200,
-			Msg:  []byte("Hello world"),
+			Msg:  []byte("Hello world (hello)"),
+		})
+
+		w.Write(msg)
+	})
+	service.HandleFunc("hello.world", func(w mrpc.TopicWriter, data []byte) {
+		log.Println("[Upstream] Request: hello.world")
+
+		msg, _ := json.Marshal(&mrpcproxy.Response{
+			Code: 200,
+			Msg:  []byte("Hello world (hello.world)"),
 		})
 
 		w.Write(msg)

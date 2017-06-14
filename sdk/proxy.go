@@ -1,6 +1,7 @@
 package sdk
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/julienschmidt/httprouter"
@@ -106,11 +108,17 @@ func New(addr string, s *mrpc.Service, opts ...func(*Proxy) error) (*Proxy, erro
 }
 
 // Handle adds endpoints to the proxy.
-func (pxy *Proxy) Handle(eps ...Endpoint) {
+func (pxy *Proxy) Handle(eps ...Endpoint) error {
 	pxy.Eps = append(pxy.Eps, eps...)
 	for _, ep := range eps {
-		pxy.router.Handle(ep.Method, ep.Path, pxy.getTopicHandler(ep))
+		h, err := pxy.getTopicHandler(ep)
+		if err != nil {
+			return err
+		}
+		pxy.router.Handle(ep.Method, ep.Path, h)
 	}
+
+	return nil
 }
 
 // Serve starts the HTTP server.
@@ -135,8 +143,22 @@ func (pxy *Proxy) Stop(ctx context.Context) error {
 	return pxy.http.Shutdown(ctx)
 }
 
-func (pxy *Proxy) getTopicHandler(ep Endpoint) httprouter.Handle {
+func (pxy *Proxy) getTopicHandler(ep Endpoint) (httprouter.Handle, error) {
+	topicTmpl, err := template.New("topic").Parse(ep.Topic)
+	if err != nil {
+		return nil, err
+	}
+
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+		var err error
+		ep.Topic, err = getTopic(topicTmpl, p)
+		if err != nil {
+			pxy.Debugger.Println(err)
+			pxy.Requests.Printf("%v - %v:%v (%v)", http.StatusInternalServerError, r.Method, r.URL, ep.Topic)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
 		res, err := pxy.mrpcRequest(r, p, ep)
 		if err != nil {
 			pxy.Debugger.Println(err)
@@ -164,7 +186,26 @@ func (pxy *Proxy) getTopicHandler(ep Endpoint) httprouter.Handle {
 		if _, err := w.Write(res.Msg); err != nil {
 			pxy.Logger.Printf("writing to http.ResponseWriter failed: %v", err)
 		}
+	}, nil
+}
+
+func getTopic(t *template.Template, p httprouter.Params) (string, error) {
+	params := map[string]string{}
+	for _, p := range p {
+		params[p.Key] = p.Value
 	}
+	var topicBuf bytes.Buffer
+	if err := t.Execute(&topicBuf, params); err != nil {
+		return "", err
+	}
+	topic, err := ioutil.ReadAll(&topicBuf)
+	if err != nil {
+		return "", err
+	}
+	if err := t.Execute(&topicBuf, params); err != nil {
+		return "", err
+	}
+	return string(topic), nil
 }
 
 func (pxy *Proxy) mrpcRequest(r *http.Request, p httprouter.Params, ep Endpoint) (*mrpcproxy.Response, error) {
