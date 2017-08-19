@@ -171,9 +171,7 @@ func TestNewServe(t *testing.T) {
 		t.Errorf("404 not logged")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-	pxy.Stop(ctx)
+	pxy.Stop(context.Background())
 	req, _ = http.NewRequest("GET", fmt.Sprintf("http://127.0.0.1:%v/404", port), nil)
 	res, _ = client.Do(req)
 	if res != nil {
@@ -200,7 +198,7 @@ func TestGetTopicHandler(t *testing.T) {
 	})
 	service.HandleFunc("b", func(w mrpc.TopicWriter, data []byte) {})
 	service.HandleFunc("c", func(w mrpc.TopicWriter, data []byte) {
-		time.Sleep(2 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 		msg, _ := json.Marshal(&mrpcproxy.Response{
 			Code:    200,
 			Msg:     []byte("OK"),
@@ -294,7 +292,7 @@ func TestGetTopicHandler(t *testing.T) {
 		},
 		{
 			topic:     "c",
-			timeout:   3,
+			timeout:   20,
 			logger:    []string{"/c, remote Addr: 1.1.1.1, Id: uuid"},
 			requests:  []string{"200 - GET:/c (service.c)"},
 			resStatus: http.StatusOK,

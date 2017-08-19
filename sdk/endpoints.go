@@ -25,7 +25,7 @@ type Endpoint struct {
 	Topic     string `json:"topic"`
 	Method    string `json:"method"`
 	Path      string `json:"path"`
-	KeepAlive int    `json:"keepAlive"` // In seconds. Overrides the default NATS timeout
+	KeepAlive int    `json:"keepAlive"` // In Millisecond. Overrides the default NATS timeout
 }
 
 type endpointsJSON map[string]struct {

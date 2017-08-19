@@ -17,7 +17,6 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/miracl/mrpc"
-	"github.com/miracl/mrpc/transport"
 	"github.com/miracl/mrpcproxy"
 )
 
@@ -227,9 +226,11 @@ func (pxy *Proxy) mrpcRequest(r *http.Request, p httprouter.Params, ep Endpoint)
 	pxy.Logger.Printf("%s, remote Addr: %s, Id: %v", r.URL.Path, req.IPAddress, req.RequestID)
 
 	res := &mrpcproxy.Response{}
-	resBytes, err := pxy.MRPCService.Request(ep.Topic, mrpcReq, setTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), setTimeout)
+	defer cancel()
+	resBytes, err := pxy.MRPCService.Request(ctx, ep.Topic, mrpcReq)
 	if err != nil {
-		if err == transport.ErrTimeout {
+		if err == context.DeadlineExceeded {
 			res.Code = http.StatusRequestTimeout
 			return res, nil
 		}
