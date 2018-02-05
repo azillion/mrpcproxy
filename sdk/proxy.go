@@ -123,16 +123,17 @@ func (pxy *Proxy) Handle(eps ...Endpoint) error {
 // Serve starts the HTTP server.
 func (pxy *Proxy) Serve() error {
 	pxy.router.NotFound = &notFoundHandler{pxy.Requests}
-	pxy.router.Handle("OPTIONS", "/*all", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		pxy.setHeaders(w)
 
-		// Run custom handler
-		if pxy.Handler != nil {
-			pxy.Handler(w, r, nil)
+	for _, ep := range pxy.Eps {
+		if ep.Method == "OPTIONS" {
+			continue
 		}
 
-		pxy.Requests.Printf("%v - %v:%v", 200, r.Method, r.URL)
-	})
+		h, _, _ := pxy.router.Lookup("OPTIONS", ep.Path)
+		if h == nil {
+			pxy.router.Handle("OPTIONS", ep.Path, pxy.defaultOptionsHandler)
+		}
+	}
 
 	return pxy.http.ListenAndServe()
 }
@@ -242,6 +243,17 @@ func (pxy *Proxy) mrpcRequest(r *http.Request, p httprouter.Params, ep Endpoint)
 	}
 
 	return res, nil
+}
+
+func (pxy *Proxy) defaultOptionsHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	pxy.setHeaders(w)
+
+	// Run custom handler
+	if pxy.Handler != nil {
+		pxy.Handler(w, r, nil)
+	}
+
+	pxy.Requests.Printf("%v - %v:%v", 200, r.Method, r.URL)
 }
 
 func (pxy *Proxy) setHeaders(w http.ResponseWriter) {

@@ -521,6 +521,111 @@ func TestMergeRequestParams(t *testing.T) {
 	}
 }
 
+func TestCustomOptionsHandler(t *testing.T) {
+	port := *portFlag
+
+	headerKey, headerVal := "Content-Type", "text/plain; charset=utf-8"
+	// Create the service
+	service, _ := mrpc.NewService(mem.New())
+	pxy, _ := New(fmt.Sprintf(":%v", port), service)
+
+	pxy.Handle(
+		Endpoint{
+			Path:      "/a",
+			Method:    "GET",
+			Topic:     "service.a",
+			KeepAlive: 0,
+		},
+		Endpoint{
+			Path:      "/a",
+			Method:    "OPTIONS",
+			Topic:     "service.a",
+			KeepAlive: 0,
+		},
+		Endpoint{
+			Path:      "/b",
+			Method:    "GET",
+			Topic:     "service.b",
+			KeepAlive: 0,
+		},
+	)
+
+	service.HandleFunc("a", func(w mrpc.TopicWriter, data []byte) {
+		req := &mrpcproxy.Request{}
+		json.Unmarshal(data, req)
+
+		var msg []byte
+		switch req.Action {
+		case "GET":
+			msg, _ = json.Marshal(&mrpcproxy.Response{
+				Code: 200,
+				Msg:  []byte("a response"),
+			})
+		case "OPTIONS":
+			msg, _ = json.Marshal(&mrpcproxy.Response{
+				Code: 200,
+				Headers: http.Header{
+					"X-Test-Handler-Header": []string{"OPTIONS"},
+				},
+			})
+		}
+
+		w.Write(msg)
+	})
+
+	// Start the proxy
+	go pxy.Serve()
+	defer pxy.Stop(context.Background())
+
+	// Block so the main starts
+	time.Sleep(100 * time.Millisecond)
+
+	client := http.DefaultClient
+
+	// Hit A endpoint
+	res, err := client.Get(fmt.Sprintf("http://127.0.0.1:%v/a", port))
+	if err != nil {
+		t.Fatal(err)
+	}
+	aRes, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		t.Fatalf("Read request body: %v", err)
+	}
+
+	if string(aRes) != "a response" {
+		t.Errorf("Unexpected response: %v", string(aRes))
+	}
+
+	// Request OPTIONS for the endpoint with custom handler
+	req, err := http.NewRequest("OPTIONS", fmt.Sprintf("http://127.0.0.1:%v/a", port), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err = client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if h, ok := res.Header[headerKey]; !ok || h[0] != headerVal {
+		t.Errorf("Missing header in OPTIONS request")
+	}
+
+	if h, ok := res.Header["X-Test-Handler-Header"]; !ok || h[0] != "OPTIONS" {
+		t.Errorf("Expected 'X-Test-Handler-Header: OPTIONS'")
+	}
+
+	// Request OPTIONS for the endpoint with default handler
+	req, err = http.NewRequest("OPTIONS", fmt.Sprintf("http://127.0.0.1:%v/b", port), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err = client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 type MockReader struct {
 	p   []byte
 	n   int
