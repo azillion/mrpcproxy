@@ -16,30 +16,42 @@ func TestParseMappingCases(t *testing.T) {
 		{
 			[]byte(`
 				{
-				  "a": {
-				    "endpoints": [
-				      {
-				        "method": "GET",
-				        "path": "/get/a/"
-				      },
-				      {
-				        "method": "PUT",
-				        "path": "/put/a/"
-				      }
-				    ]
-				  },
-				  "b": {
-				    "endpoints": [
-				      {
-				        "method": "GET",
-				        "path": "/get/b/"
-				      },
-				      {
-				        "method": "POST",
-				        "path": "/post/b/"
-				      }
-				    ]
-				  }
+					"/get/a/": {
+						"endpoints": [
+							{
+								"topic": "a",
+								"method": "GET",
+								"keepAlive": 0
+							}
+						]
+					},
+					"/get/b/": {
+						"endpoints": [
+							{
+								"topic": "b",
+								"method": "GET",
+								"keepAlive": 0
+							}
+						]
+					},
+					"/post/b/": {
+						"endpoints": [
+							{
+								"topic": "b",
+								"method": "POST",
+								"keepAlive": 0
+							}
+						]
+					},
+					"/put/a/": {
+						"endpoints": [
+							{
+								"topic": "a",
+								"method": "PUT",
+								"keepAlive": 0
+							}
+						]
+					}
 				}
 			`),
 			[]Endpoint{

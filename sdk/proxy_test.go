@@ -100,7 +100,12 @@ func TestNewServe(t *testing.T) {
 			return nil
 		},
 	)
-	pxy.Handle(Endpoint{"service.a", "GET", "/a", 0})
+	pxy.Handle(Endpoint{
+		Topic:     "service.a",
+		Method:    "GET",
+		Path:      "/a",
+		KeepAlive: 0,
+	})
 
 	// Simulate application handling mrpc request
 	service.HandleFunc("a", func(w mrpc.TopicWriter, data []byte) {
@@ -369,10 +374,10 @@ func TestGetTopicHandler(t *testing.T) {
 			}
 
 			h, err := pxy.getTopicHandler(Endpoint{
-				fmt.Sprintf("service.%v", tc.topic),
-				"GET",
-				pattern,
-				tc.timeout,
+				Topic:     fmt.Sprintf("service.%v", tc.topic),
+				Method:    "GET",
+				Path:      pattern,
+				KeepAlive: tc.timeout,
 			})
 			if err != nil {
 				t.Fatal(err)

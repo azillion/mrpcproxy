@@ -22,9 +22,9 @@ var (
 
 // Endpoint is the the representation of a single route.
 type Endpoint struct {
-	Topic     string `json:"topic"`
+	Path      string
 	Method    string `json:"method"`
-	Path      string `json:"path"`
+	Topic     string `json:"topic"`
 	KeepAlive int    `json:"keepAlive"` // In Millisecond. Overrides the default NATS timeout
 }
 
@@ -48,9 +48,9 @@ func ParseMapping(eps []byte) ([]Endpoint, error) {
 	}
 
 	mapping := []Endpoint{}
-	for topic, eps := range topicMap {
+	for path, eps := range topicMap {
 		for _, ep := range eps.Endpoints {
-			ep.Topic = topic
+			ep.Path = path
 			mapping = append(mapping, ep)
 		}
 	}

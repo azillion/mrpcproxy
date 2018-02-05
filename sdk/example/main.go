@@ -22,23 +22,26 @@ const (
 
 	endpoints = `
 		{
-		  "example.hello": {
-		    "endpoints": [
-		      {
-		        "method": "GET",
-		        "path": "/hello"
-		      }
-		    ]
-		  },
-			"example.hello.{{.something}}": {
-		    "endpoints": [
-		      {
-		        "method": "GET",
-		        "path": "/hello/:something"
-		      }
-		    ]
-		  }
-		}`
+			"/hello": {
+				"endpoints": [
+					{
+						"topic": "example.hello",
+						"method": "GET",
+						"keepAlive": 0
+					}
+				]
+			},
+			"/hello/:something": {
+				"endpoints": [
+					{
+						"topic": "example.hello.{{.something}}",
+						"method": "GET",
+						"keepAlive": 0
+					}
+				]
+			}
+		}
+	`
 )
 
 func main() {
