@@ -86,7 +86,7 @@ func TestNewServe(t *testing.T) {
 
 	l := &MockLogger{}
 
-	headerKey, headerVal := "Content-Type", "text/plain; charset=utf-8"
+	headerKey, headerVal := "X-Test-Generic-Header", "OK"
 	// Create the service
 	service, _ := mrpc.NewService(mem.New())
 	pxy, _ := New(
@@ -524,7 +524,6 @@ func TestMergeRequestParams(t *testing.T) {
 func TestCustomOptionsHandler(t *testing.T) {
 	port := *portFlag
 
-	headerKey, headerVal := "Content-Type", "text/plain; charset=utf-8"
 	// Create the service
 	service, _ := mrpc.NewService(mem.New())
 	pxy, _ := New(fmt.Sprintf(":%v", port), service)
@@ -605,10 +604,6 @@ func TestCustomOptionsHandler(t *testing.T) {
 	res, err = client.Do(req)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	if h, ok := res.Header[headerKey]; !ok || h[0] != headerVal {
-		t.Errorf("Missing header in OPTIONS request")
 	}
 
 	if h, ok := res.Header["X-Test-Handler-Header"]; !ok || h[0] != "OPTIONS" {
