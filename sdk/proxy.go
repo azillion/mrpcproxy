@@ -167,7 +167,10 @@ func (pxy *Proxy) getTopicHandler(ep Endpoint) (httprouter.Handle, error) {
 			return
 		}
 
-		// Set the headers
+		// Set default headers
+		pxy.setHeaders(w)
+
+		// Set custom response headers
 		for header, values := range res.Headers {
 			for _, v := range values {
 				w.Header().Set(header, v)
@@ -175,7 +178,6 @@ func (pxy *Proxy) getTopicHandler(ep Endpoint) (httprouter.Handle, error) {
 		}
 
 		pxy.Requests.Printf("%v - %v:%v (%v)", res.Code, r.Method, r.URL, ep.Topic)
-		pxy.setHeaders(w)
 
 		// Run custom handler
 		if pxy.Handler != nil {
