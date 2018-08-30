@@ -250,8 +250,8 @@ func TestGetTopicHandler(t *testing.T) {
 	}{
 		{
 			topic:     "a",
-			logger:    []string{"/a, remote Addr: 1.1.1.1, Id: uuid"},
-			requests:  []string{"200 - GET:/a (service.a)"},
+			logger:    []string{"GET:/a, remote Addr: 1.1.1.1, Id: uuid"},
+			requests:  []string{"GET:/a, status: 200, topic: service.a, Id: uuid"},
 			resStatus: http.StatusOK,
 			resBody:   "OK",
 			resHeaders: map[string][]string{
@@ -262,8 +262,8 @@ func TestGetTopicHandler(t *testing.T) {
 		},
 		{
 			topic:    "a",
-			logger:   []string{"/a, remote Addr: 2.2.2.2, Id: uuid"},
-			requests: []string{"200 - GET:/a (service.a)"},
+			logger:   []string{"GET:/a, remote Addr: 2.2.2.2, Id: uuid"},
+			requests: []string{"GET:/a, status: 200, topic: service.a, Id: uuid"},
 			reqHeaders: map[string][]string{
 				"X-Forwarded-For": {"2.2.2.2"},
 			},
@@ -278,8 +278,8 @@ func TestGetTopicHandler(t *testing.T) {
 		{
 			topic:     "b",
 			timeout:   1,
-			logger:    []string{"/b, remote Addr: 1.1.1.1, Id: uuid"},
-			requests:  []string{"408 - GET:/b (service.b)"},
+			logger:    []string{"GET:/b, remote Addr: 1.1.1.1, Id: uuid"},
+			requests:  []string{"GET:/b, status: 408, topic: service.b, Id: uuid"},
 			resStatus: http.StatusRequestTimeout,
 			resHeaders: map[string][]string{
 				"X-Test-Handler-Header": {"OK"},
@@ -288,8 +288,8 @@ func TestGetTopicHandler(t *testing.T) {
 		{
 			topic:     "c",
 			timeout:   1,
-			logger:    []string{"/c, remote Addr: 1.1.1.1, Id: uuid"},
-			requests:  []string{"408 - GET:/c (service.c)"},
+			logger:    []string{"GET:/c, remote Addr: 1.1.1.1, Id: uuid"},
+			requests:  []string{"GET:/c, status: 408, topic: service.c, Id: uuid"},
 			resStatus: http.StatusRequestTimeout,
 			resHeaders: map[string][]string{
 				"X-Test-Handler-Header": {"OK"},
@@ -298,8 +298,8 @@ func TestGetTopicHandler(t *testing.T) {
 		{
 			topic:     "c",
 			timeout:   20,
-			logger:    []string{"/c, remote Addr: 1.1.1.1, Id: uuid"},
-			requests:  []string{"200 - GET:/c (service.c)"},
+			logger:    []string{"GET:/c, remote Addr: 1.1.1.1, Id: uuid"},
+			requests:  []string{"GET:/c, status: 200, topic: service.c, Id: uuid"},
 			resStatus: http.StatusOK,
 			resBody:   "OK",
 			resHeaders: map[string][]string{
@@ -310,7 +310,7 @@ func TestGetTopicHandler(t *testing.T) {
 		{
 			topic:      "a",
 			debugger:   []string{"Request body read error\n"},
-			requests:   []string{"500 - GET:/a (service.a)"},
+			requests:   []string{"GET:/a, status: 500, topic: service.a"},
 			reqBody:    &MockReader{err: errors.New("Request body read error")},
 			resStatus:  http.StatusInternalServerError,
 			resHeaders: map[string][]string{},
@@ -318,16 +318,16 @@ func TestGetTopicHandler(t *testing.T) {
 		{
 			topic:      "e",
 			debugger:   []string{"Malformed mrpcproxy Response: invalid character 'M' looking for beginning of value\n"},
-			logger:     []string{"/e, remote Addr: 1.1.1.1, Id: uuid"},
-			requests:   []string{"500 - GET:/e (service.e)"},
+			logger:     []string{"GET:/e, remote Addr: 1.1.1.1, Id: uuid"},
+			requests:   []string{"GET:/e, status: 500, topic: service.e"},
 			resStatus:  http.StatusInternalServerError,
 			resHeaders: map[string][]string{},
 		},
 		{
 			topic:      "w.{{.id}}",
 			pattern:    "/w/:id",
-			logger:     []string{"/w/1, remote Addr: 1.1.1.1, Id: uuid"},
-			requests:   []string{"200 - GET:/w/1 (service.w.1)"},
+			logger:     []string{"GET:/w/1, remote Addr: 1.1.1.1, Id: uuid"},
+			requests:   []string{"GET:/w/1, status: 200, topic: service.w.1, Id: uuid"},
 			reqURL:     "/w/1",
 			resStatus:  http.StatusOK,
 			resBody:    "w.1",
@@ -337,8 +337,8 @@ func TestGetTopicHandler(t *testing.T) {
 		{
 			topic:      "w.{{.id}}",
 			pattern:    "/w/:id",
-			logger:     []string{"/w/2, remote Addr: 1.1.1.1, Id: uuid"},
-			requests:   []string{"200 - GET:/w/2 (service.w.2)"},
+			logger:     []string{"GET:/w/2, remote Addr: 1.1.1.1, Id: uuid"},
+			requests:   []string{"GET:/w/2, status: 200, topic: service.w.2, Id: uuid"},
 			reqURL:     "/w/2",
 			resStatus:  http.StatusOK,
 			resBody:    "w.2",

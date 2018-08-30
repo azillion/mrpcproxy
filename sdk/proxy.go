@@ -154,7 +154,7 @@ func (pxy *Proxy) getTopicHandler(ep Endpoint) (httprouter.Handle, error) {
 		ep.Topic, err = getTopic(topicTmpl, p)
 		if err != nil {
 			pxy.Debugger.Println(err)
-			pxy.Requests.Printf("%v - %v:%v (%v)", http.StatusInternalServerError, r.Method, r.URL, ep.Topic)
+			pxy.Requests.Printf("%v:%v, status: %v, topic: %v", r.Method, r.URL.Path, http.StatusInternalServerError, ep.Topic)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -162,7 +162,7 @@ func (pxy *Proxy) getTopicHandler(ep Endpoint) (httprouter.Handle, error) {
 		res, err := pxy.mrpcRequest(r, p, ep)
 		if err != nil {
 			pxy.Debugger.Println(err)
-			pxy.Requests.Printf("%v - %v:%v (%v)", http.StatusInternalServerError, r.Method, r.URL, ep.Topic)
+			pxy.Requests.Printf("%v:%v, status: %v, topic: %v", r.Method, r.URL.Path, http.StatusInternalServerError, ep.Topic)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -177,7 +177,7 @@ func (pxy *Proxy) getTopicHandler(ep Endpoint) (httprouter.Handle, error) {
 			}
 		}
 
-		pxy.Requests.Printf("%v - %v:%v (%v)", res.Code, r.Method, r.URL, ep.Topic)
+		pxy.Requests.Printf("%v:%v, status: %v, topic: %v, Id: %v", r.Method, r.URL.Path, res.Code, ep.Topic, res.RequestID)
 
 		// Run custom handler
 		if pxy.Handler != nil {
@@ -226,9 +226,9 @@ func (pxy *Proxy) mrpcRequest(r *http.Request, p httprouter.Params, ep Endpoint)
 		setTimeout = time.Duration(ep.KeepAlive) * time.Millisecond
 	}
 
-	pxy.Logger.Printf("%s, remote Addr: %s, Id: %v", r.URL.Path, req.IPAddress, req.RequestID)
+	pxy.Logger.Printf("%v:%v, remote Addr: %v, Id: %v", r.Method, r.URL.Path, req.IPAddress, req.RequestID)
 
-	res := &mrpcproxy.Response{}
+	res := &mrpcproxy.Response{RequestID: req.RequestID}
 	ctx, cancel := context.WithTimeout(r.Context(), setTimeout)
 	defer cancel()
 	resBytes, err := pxy.MRPCService.Request(ctx, ep.Topic, mrpcReq)
@@ -244,6 +244,7 @@ func (pxy *Proxy) mrpcRequest(r *http.Request, p httprouter.Params, ep Endpoint)
 		return nil, ResponseError{err}
 	}
 
+	res.RequestID = req.RequestID
 	return res, nil
 }
 
