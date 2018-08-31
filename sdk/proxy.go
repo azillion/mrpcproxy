@@ -256,7 +256,7 @@ func (pxy *Proxy) defaultOptionsHandler(w http.ResponseWriter, r *http.Request, 
 		pxy.Handler(w, r, nil)
 	}
 
-	pxy.Requests.Printf("%v - %v:%v", 200, r.Method, r.URL)
+	pxy.Requests.Printf("%v:%v, status: %v", r.Method, r.URL.Path, http.StatusOK)
 }
 
 func (pxy *Proxy) setHeaders(w http.ResponseWriter) {
@@ -312,6 +312,6 @@ type notFoundHandler struct {
 }
 
 func (h *notFoundHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	h.Requests.Printf("%v - %v:%v", http.StatusNotFound, r.Method, r.URL)
+	h.Requests.Printf("%v:%v, status: %v", r.Method, r.URL.Path, http.StatusNotFound)
 	w.WriteHeader(http.StatusNotFound)
 }

@@ -172,7 +172,7 @@ func TestNewServe(t *testing.T) {
 		t.Errorf("404 handler returns wrong status code: %v", res.StatusCode)
 	}
 
-	if l.storage[len(l.storage)-1] != "404 - GET:/404" {
+	if l.storage[len(l.storage)-1] != "GET:/404, status: 404" {
 		t.Errorf("404 not logged")
 	}
 
