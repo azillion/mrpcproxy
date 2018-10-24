@@ -12,7 +12,7 @@ matrix:
 
 install:
   - go get ./...
-  - if [ "$FULL" = "true" ]; then go get github.com/golang/lint/golint; fi;
+  - if [ "$FULL" = "true" ]; then go get golang.org/x/lint/golint; fi;
   - if [ "$FULL" = "true" ]; then go get github.com/mattn/goveralls; fi;
 
 before_script:
